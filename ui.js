@@ -1,6 +1,9 @@
 import { makeRules, initStandard, getValidMoves, playMove } from "./engine.js";
 import { bestMove } from "./ai.js";
 
+window.__ui_loaded = true;
+console.log("ui.js loaded");
+
 // ---------- Mode ----------
 const Mode = Object.freeze({
   HvAI: "HvAI",
