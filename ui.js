@@ -61,6 +61,40 @@ let moves = []; // entries: { mover, pitIndex }  mover=0|1
 // auto-play timer for AIvAI
 let nextAutoTime = 0;
 
+let gameLogged = false;
+
+async function logCompletedGameOnce() {
+  if (gameLogged) return;
+  if (!state.terminal) return;
+
+  const payload = currentGamePayload();
+  if (!payload) return;
+
+  gameLogged = true;
+
+  // Use sendBeacon if possible (more reliable on page close)
+  const url = "https://YOUR-WORKER.SUBDOMAIN.workers.dev/log"; // replace later
+  const body = JSON.stringify(payload);
+
+  if (navigator.sendBeacon) {
+    const blob = new Blob([body], { type: "application/json" });
+    navigator.sendBeacon(url, blob);
+    return;
+  }
+
+  // Fallback fetch
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    });
+  } catch {
+    // If it fails, we intentionally don't spam retries.
+  }
+}
+
 // ---------- Helpers ----------
 function letterForMove(mover, pitIndex) {
   return String.fromCharCode((mover === 0 ? "a".charCodeAt(0) : "A".charCodeAt(0)) + pitIndex);
@@ -94,6 +128,7 @@ function currentAiDepth() {
 }
 
 function resetGame() {
+  gameLogged = false;
   state = initStandard(rules, 0);
   vis = structuredClone(state);
   anim = null;
@@ -120,6 +155,7 @@ function undoOne() {
   if (moves.length === 0) return;
   moves.pop();
   replayFromStart();
+  if (!state.terminal) gameLogged = false;
   renderAll();
 }
 
@@ -237,6 +273,8 @@ function parseMoveString(s) {
 
 function loadMovesFromString(s) {
   if (anim) return { ok: false, error: "Cannot load while animating" };
+
+  gameLogged = false;
 
   const parsed = parseMoveString(s);
   if (!parsed.ok) return parsed;
@@ -531,6 +569,8 @@ function renderAll() {
   elUndoTurn.disabled = busy;
   elAiMove.disabled = busy || mode === Mode.HvH;
   elStepAi.disabled = busy || mode !== Mode.AIvAI;
+
+  logCompletedGameOnce();
 }
 
 // ---------- Input: click pits ----------
@@ -677,6 +717,34 @@ function loop(now) {
   }
 
   requestAnimationFrame(loop);
+}
+
+// ---------- Data Analytics ----------
+
+function currentGamePayload() {
+  const moveString = movesToString(moves); // you already wrote this earlier
+  const m = mode;
+
+  // Ignore AIvAI as requested
+  if (m === Mode.AIvAI) return null;
+  if (!moveString || moveString.length === 0) return null;
+
+  let depth = null;
+  if (m === Mode.HvAI || m === Mode.AIvH) {
+    depth = parseInt(elDepth.value, 10) || 6;
+  }
+
+  return {
+    mode: m,
+    depth,                 // null for HvH
+    moves: moveString,
+    plies: moves.length,
+    // optional: final stores can be helpful
+    finalStore0: state.store[0],
+    finalStore1: state.store[1],
+    // optional: timestamp
+    ts: Date.now(),
+  };
 }
 
 // ---------- init ----------
