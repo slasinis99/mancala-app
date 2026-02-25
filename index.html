@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kalah Web</title>
+  <style>
+    :root { --pad: 12px; }
+    body { margin: 0; font-family: system-ui, Segoe UI, Arial, sans-serif; background: #f7f7fb; color: #222; }
+    .wrap { display: grid; grid-template-columns: 1fr 320px; gap: var(--pad); padding: var(--pad); height: 100vh; box-sizing: border-box; }
+    .left { display: grid; grid-template-rows: auto 1fr auto; gap: var(--pad); min-width: 0; }
+    .panel { background: white; border: 1px solid #ddd; border-radius: 10px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button { padding: 8px 10px; border-radius: 8px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+    button:hover { background: #f1f1f6; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    input[type="number"] { width: 70px; padding: 6px; border-radius: 8px; border: 1px solid #bbb; }
+    label { font-size: 13px; color: #444; display: inline-flex; gap: 6px; align-items: center; }
+    #board { width: 100%; height: 100%; display: block; border-radius: 10px; background: #ffffff; border: 1px solid #ddd; }
+    .moves { height: 220px; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; white-space: pre-wrap; background: #fafafe; }
+    .right .panel { display: grid; gap: 10px; }
+    .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+    .small { font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="left">
+      <div class="panel toolbar">
+        <button id="helpBtn">How to Play</button>
+        <button id="newGame">New Game</button>
+        <button id="modeBtn">Mode: HvAI</button>
+        <button id="undoMove">Undo Move</button>
+        <button id="undoTurn">Undo Turn</button>
+
+        <label>Anim (s/seed)
+          <input id="animDelay" type="number" min="0.01" step="0.01" value="0.12" />
+        </label>
+
+        <button id="loadMoves">Load Moves</button>
+        <button id="copyMoves">Copy Moves</button>
+
+        <span id="status" class="small"></span>
+      </div>
+
+      <canvas id="board"></canvas>
+
+      <div class="panel moves" id="moves"></div>
+    </div>
+
+    <div class="right">
+      <div class="panel">
+        <div class="row">
+          <strong>AI Controls</strong>
+          <button id="stepAi">Step AI</button>
+        </div>
+
+        <div class="row">
+          <label>AI depth
+            <input id="depth" type="number" min="1" max="20" step="1" value="6" />
+          </label>
+          <button id="aiMove">AI Move</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid #eee;margin:6px 0">
+
+        <strong>AIvAI</strong>
+        <div class="row">
+          <label>P0 depth
+            <input id="depthP0" type="number" min="1" max="20" step="1" value="6" />
+          </label>
+          <label>P1 depth
+            <input id="depthP1" type="number" min="1" max="20" step="1" value="6" />
+          </label>
+        </div>
+
+        <div class="row">
+          <label>Auto
+            <input id="autoAi" type="checkbox" />
+          </label>
+          <label>Auto delay (s)
+            <input id="autoDelay" type="number" min="0.1" step="0.1" value="3.0" />
+          </label>
+        </div>
+
+        <div class="small">
+          Click pits to move when it’s a human’s turn. In AIvAI, use Step or Auto.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="helpModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000;">
+    <div style="
+        max-width: 720px;
+        margin: 6vh auto;
+        background: white;
+        border-radius: 12px;
+        padding: 16px 16px 12px 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.25);
+        ">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <h2 style="margin:0; font-size:18px;">Kalah (6,4) — How to Play</h2>
+        <button id="helpClose" style="padding:6px 10px;">Close</button>
+        </div>
+
+        <div style="margin-top:10px; line-height:1.35; font-size:14px;">
+        <ol style="margin-top:8px;">
+            <li><b>Goal:</b> finish with more seeds in your store than your opponent.</li>
+            <li><b>Board:</b> each player has 6 pits and 1 store (Kalah). Start with 4 seeds per pit.</li>
+            <li><b>Move:</b> choose one of your non-empty pits and pick up all seeds. Sow them one-by-one counterclockwise into the next pits and your store.</li>
+            <li><b>Skip opponent store:</b> you never place seeds into your opponent’s store.</li>
+            <li><b>Extra turn:</b> if your last seed lands in <i>your</i> store, you play again.</li>
+            <li><b>Capture:</b> if your last seed lands in an empty pit on your side, you capture that seed plus all seeds in the opposite pit into your store (only if the opposite pit has seeds).</li>
+            <li><b>Game end:</b> if either side’s 6 pits become empty, the game ends. Remaining seeds on the other side are swept into that player’s store.</li>
+        </ol>
+
+        <p style="margin:10px 0 0 0;">
+            <b>Move notation (for Load/Copy):</b> P0 uses <code>a–f</code> (left→right, indices 0–5), P1 uses <code>A–F</code>.
+        </p>
+        <p style="margin:8px 0 0 0;">
+            <b>Tip:</b> Hover a valid pit on your turn to see it highlighted.
+        </p>
+        </div>
+
+        <div style="margin-top:12px; font-size:12px; color:#666;">
+        Press <b>Esc</b> or click outside this box to close.
+        </div>
+    </div>
+    </div>
+
+  <script type="module" src="./ui.js"></script>
+</body>
+</html>
